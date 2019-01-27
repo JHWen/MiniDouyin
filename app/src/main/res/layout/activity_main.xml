@@ -26,10 +26,10 @@
         tools:listitem="@layout/video_item_list" />
 
     <Button
-        android:id="@+id/btn_detail"
+        android:id="@+id/btn_record"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="detail button"
+        android:text="record video"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
