@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.v4.widget.ContentLoadingProgressBar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.widget.Button;
@@ -37,6 +38,7 @@ public class VideoUploadActivity extends AppCompatActivity {
 
     private VideoView videoView;
     private Button btnUpload;
+    private ContentLoadingProgressBar progressBar;
 
     private File videoFile;
 
@@ -63,6 +65,7 @@ public class VideoUploadActivity extends AppCompatActivity {
 
         videoView = findViewById(R.id.video_view);
         btnUpload = findViewById(R.id.btn_upload);
+        progressBar = findViewById(R.id.pb_loading);
 
 
         Bundle extras = getIntent().getExtras();
@@ -90,6 +93,7 @@ public class VideoUploadActivity extends AppCompatActivity {
         // 上次视频操作
         btnUpload.setOnClickListener(v -> {
             if (mSelectedImage != null && mSelectedVideo != null) {
+                progressBar.show();
                 postVideo();
             } else {
                 Toast.makeText(getApplicationContext(), "请选择封面图", Toast.LENGTH_LONG).show();
