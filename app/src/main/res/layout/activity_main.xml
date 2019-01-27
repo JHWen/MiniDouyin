@@ -22,7 +22,8 @@
         android:id="@+id/rv_video_list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical" />
+        android:orientation="vertical"
+        tools:listitem="@layout/video_item_list" />
 
     <Button
         android:id="@+id/btn_detail"
