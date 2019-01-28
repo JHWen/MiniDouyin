@@ -73,4 +73,9 @@ public class CircleProgressBarView extends View {
         mValueAnimator.cancel();
     }
 
+    public void reset() {
+        isRecording = false;
+        invalidate();
+    }
+
 }
