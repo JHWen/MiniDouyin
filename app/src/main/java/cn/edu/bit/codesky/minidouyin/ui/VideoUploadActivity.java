@@ -90,6 +90,8 @@ public class VideoUploadActivity extends AppCompatActivity {
             }
         });
 
+        progressBar.hide();
+
         // 上次视频操作
         btnUpload.setOnClickListener(v -> {
             if (mSelectedImage != null && mSelectedVideo != null) {
