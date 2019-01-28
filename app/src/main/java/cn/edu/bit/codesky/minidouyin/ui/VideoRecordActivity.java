@@ -1,14 +1,16 @@
 package cn.edu.bit.codesky.minidouyin.ui;
 
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.Surface;
@@ -19,6 +21,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Chronometer;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -31,7 +34,6 @@ import cn.edu.bit.codesky.minidouyin.widget.CircleProgressBarView;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.MEDIA_TYPE_IMAGE;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.MEDIA_TYPE_VIDEO;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.getOutputMediaFile;
-import static java.lang.Math.floor;
 import static java.lang.Math.sqrt;
 
 /**
@@ -49,6 +51,10 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
     private Chronometer chronometer;
     private CircleProgressBarView circleProgressBarView;
     private Button btnRecord;
+    private Button btnDelete;
+
+    private Handler handler;
+    private Runnable autoStopRecordRunnable;
 
     private int CAMERA_TYPE = Camera.CameraInfo.CAMERA_FACING_BACK;
 
@@ -58,6 +64,7 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
 
     private static final String BUNDLE_KEY = "bundle_key";
     private static final String VIDEO_FILE_PATH_KEY = "video_file_path";
+    private static final int MAX_RECORD_TIME = 11 * 1000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +73,14 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_video_record);
+
+        handler = new Handler();
+        autoStopRecordRunnable = () -> {
+            if (isRecording) {
+                //十秒自动结束录制
+                stopRecordProcess();
+            }
+        };
 
         circleProgressBarView = findViewById(R.id.circle_progress_bar);
         chronometer = findViewById(R.id.chronometer);
@@ -106,16 +121,11 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                     chronometer.start();
                     circleProgressBarView.startProgressAnimation();
                     // 事件分发机制，延迟10秒执行操作
-                    new Handler().postDelayed(() -> {
-                        if (isRecording) {
-                            //十秒自动结束录制
-                            stopRecordProcess();
-                        }
-                    }, 11 * 1000);
+                    handler.postDelayed(autoStopRecordRunnable, MAX_RECORD_TIME);
 
                     // 视频至少录制3秒
                     btnRecord.setEnabled(false);
-                    new Handler().postDelayed(() -> btnRecord.setEnabled(true), 3 * 1000);
+                    handler.postDelayed(() -> btnRecord.setEnabled(true), 3 * 1000);
 
                 } else {
                     isRecording = false;
@@ -134,26 +144,46 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
             }
         });
 
-        findViewById(R.id.btn_zoom).setOnClickListener(v -> {
-            // 调焦，需要判断手机是否支持
-            if (mCamera != null) {
-                Camera.Parameters parameters = mCamera.getParameters();
-                if (parameters.isZoomSupported()) {
-                    int maxZoom = parameters.getMaxZoom();
-                    int currentZoom = parameters.getZoom();
-                    Log.d(TAG, "maxZoom:" + maxZoom);
-                    Log.d(TAG, "maxZoom:" + currentZoom);
-                    int changeZoom = currentZoom + 10;
-                    if (changeZoom > maxZoom) {
-                        changeZoom = 0;
-                    } else {
-                        changeZoom = Math.min(changeZoom, maxZoom);
-                    }
-                    parameters.setZoom(changeZoom);
-                    mCamera.setParameters(parameters);
-                    Log.d(TAG, "zoom: " + changeZoom);
-                }
-            }
+
+        btnDelete = findViewById(R.id.btn_cancel_delete_video);
+        btnDelete.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("提示")
+                    .setMessage("确认删除上一段视频？")
+                    .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            Log.d(TAG, "执行删除操作");
+                            if (null != outputVideoFile && outputVideoFile.exists()) {
+                                boolean flag = outputVideoFile.delete();
+                                if (flag) {
+                                    Toast.makeText(getApplicationContext(), "删除成功，请重新录制！", Toast.LENGTH_LONG)
+                                            .show();
+
+                                    // 执行初始化逻辑，清空状态
+                                    btnNextStep.setVisibility(View.GONE);
+                                    btnDelete.setVisibility(View.GONE);
+                                    chronometer.setBase(SystemClock.elapsedRealtime());
+                                    circleProgressBarView.reset();
+
+                                    //移除10秒自动停止任务
+                                    handler.removeCallbacks(autoStopRecordRunnable);
+                                    // 发送广播通知相册更新数据,显示所拍摄的视频
+                                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
+                                    outputVideoFile = null;
+                                } else {
+                                    Toast.makeText(getApplicationContext(), "删除失败", Toast.LENGTH_LONG)
+                                            .show();
+                                }
+                            }
+                        }
+                    })
+                    .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            Log.d(TAG, "取消删除操作");
+                        }
+                    }).create().show();
         });
     }
 
@@ -254,12 +284,16 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         // 停止录制
         releaseMediaRecorder();
 
-        btnNextStep.setEnabled(true);
-        btnNextStep.setVisibility(View.VISIBLE);
+        this.runOnUiThread(() -> {
+            // 显示取消按钮
+            btnNextStep.setVisibility(View.VISIBLE);
+            btnDelete.setVisibility(View.VISIBLE);
+            chronometer.stop();
+            circleProgressBarView.stopProgressAnimation();
+        });
+
         isRecording = false;
 
-        chronometer.stop();
-        circleProgressBarView.stopProgressAnimation();
         // 发送广播通知相册更新数据,显示所拍摄的视频
         sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
 
