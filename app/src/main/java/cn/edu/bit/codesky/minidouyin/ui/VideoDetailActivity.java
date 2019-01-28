@@ -1,6 +1,8 @@
 package cn.edu.bit.codesky.minidouyin.ui;
 
 import android.os.Bundle;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -19,6 +21,8 @@ import cn.edu.bit.codesky.minidouyin.R;
  * @description default
  */
 public class VideoDetailActivity extends GSYBaseActivityDetail<StandardGSYVideoPlayer> {
+
+    private static final String TAG = VideoDetailActivity.class.getName();
 
     private StandardGSYVideoPlayer videoDetailPlayer;
 
@@ -51,6 +55,7 @@ public class VideoDetailActivity extends GSYBaseActivityDetail<StandardGSYVideoP
         videoDetailPlayer.getBackButton().setVisibility(View.VISIBLE);
 
         initVideoBuilderMode();
+
     }
 
 
@@ -81,6 +86,7 @@ public class VideoDetailActivity extends GSYBaseActivityDetail<StandardGSYVideoP
     public void clickForFullScreen() {
 
     }
+
 
     /**
      * 是否启动旋转横屏，true表示启动

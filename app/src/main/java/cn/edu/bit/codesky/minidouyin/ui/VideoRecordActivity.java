@@ -10,6 +10,7 @@ import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -30,6 +31,8 @@ import cn.edu.bit.codesky.minidouyin.widget.CircleProgressBarView;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.MEDIA_TYPE_IMAGE;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.MEDIA_TYPE_VIDEO;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.getOutputMediaFile;
+import static java.lang.Math.floor;
+import static java.lang.Math.sqrt;
 
 /**
  * @author codesky
@@ -152,6 +155,98 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                 }
             }
         });
+    }
+
+
+    /**
+     * @param zoomNum  放大或缩小的数量
+     * @param isZoomUp true为放大，false为缩小
+     */
+    private void adjustZoom(int zoomNum, boolean isZoomUp) {
+        if (mCamera != null) {
+            Camera.Parameters parameters = mCamera.getParameters();
+            if (parameters.isZoomSupported()) {
+                int maxZoom = parameters.getMaxZoom();
+                int currentZoom = parameters.getZoom();
+
+                Log.d(TAG, "maxZoom:" + maxZoom);
+                Log.d(TAG, "maxZoom:" + currentZoom);
+                int changeZoom;
+                if (isZoomUp) {
+                    // 放大
+                    changeZoom = currentZoom + zoomNum;
+                    changeZoom = Math.min(changeZoom, maxZoom);
+                } else {
+                    // 缩小
+                    changeZoom = currentZoom - zoomNum;
+                    changeZoom = Math.max(changeZoom, 0);
+                }
+                parameters.setZoom(changeZoom);
+                mCamera.setParameters(parameters);
+                Log.d(TAG, "zoom: " + changeZoom);
+            }
+        }
+    }
+
+    private int mode = 0;
+    private boolean fingerHasMove = false;
+    private float preDistance = 0;
+
+    // 监听触摸事件，实现双指手势缩放调焦
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        switch (event.getAction() & MotionEvent.ACTION_MASK) {
+            case MotionEvent.ACTION_DOWN:
+                //单指触摸
+                mode = 1;
+                Log.d(TAG, "ACTION_DOWN");
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                mode = 2;
+                Log.d(TAG, "ACTION_POINTER_DOWN");
+                break;
+            case MotionEvent.ACTION_MOVE:
+                Log.d(TAG, "ACTION_MOVE");
+                if (mode == 2) {
+                    if (!fingerHasMove) {
+                        preDistance = getDistance(event);
+                        fingerHasMove = true;
+                    } else {
+                        float distance = getDistance(event);
+                        if (distance - preDistance > 10) {
+                            // 放大
+                            adjustZoom(20, true);
+                            mode = 0;
+                        } else if (preDistance - distance > 10) {
+                            // 缩小
+                            adjustZoom(20, false);
+                            mode = 0;
+                        }
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                Log.d(TAG, "ACTION_UP");
+                mode = 0;
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                Log.d(TAG, "ACTION_POINTER_UP");
+                // 一个手指离开屏幕
+                preDistance = 0;
+                fingerHasMove = false;
+                mode = 0;
+                break;
+        }
+        return super.onTouchEvent(event);
+
+    }
+
+    // 计算两个屏幕触点之间的距离
+    private float getDistance(MotionEvent event) {
+        // 勾股定理
+        float dx = event.getX(1) - event.getY(0);
+        float dy = event.getY(1) - event.getY(0);
+        return (float) sqrt(dx * dx + dy * dy);
     }
 
     // 停止录制的一系列操作
@@ -404,5 +499,6 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         }
         return optimalSize;
     }
+
 
 }
