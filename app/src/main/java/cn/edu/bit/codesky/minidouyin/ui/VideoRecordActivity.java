@@ -123,6 +123,10 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                     // 事件分发机制，延迟10秒执行操作
                     handler.postDelayed(autoStopRecordRunnable, MAX_RECORD_TIME);
 
+                    //隐藏左右的按钮
+                    btnDelete.setVisibility(View.GONE);
+                    btnNextStep.setVisibility(View.GONE);
+
                     // 视频至少录制3秒
                     btnRecord.setEnabled(false);
                     handler.postDelayed(() -> btnRecord.setEnabled(true), 3 * 1000);
