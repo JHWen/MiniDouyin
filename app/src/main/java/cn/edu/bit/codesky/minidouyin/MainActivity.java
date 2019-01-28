@@ -167,6 +167,8 @@ public class MainActivity extends AppCompatActivity implements VideoListAdapter.
         Bundle bundle = new Bundle();
         bundle.putString(URL_KEY, feed.getVideoUrl());
         bundle.putString(TITLE_KEY, feed.getUsername());
+        bundle.putString("cover", feed.getImageUrl());
+        bundle.putString("stuid", feed.getStudentId());
         intent.putExtra(URL_BUNDLE, bundle);
         startActivity(intent);
     }
