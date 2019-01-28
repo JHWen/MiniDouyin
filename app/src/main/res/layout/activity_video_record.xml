@@ -28,7 +28,7 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="30dp"
-        android:background="@drawable/record_button_bg" />
+        android:background="@drawable/record_button_selector" />
 
     <Button
         android:id="@+id/btn_next_step"
@@ -48,12 +48,21 @@
         android:id="@+id/chronometer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_marginStart="10dp"
-        android:layout_marginLeft="10dp"
-        android:layout_marginTop="10dp"
+        android:layout_above="@id/btn_record"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="20dp"
+        android:textColor="#ffffff"
+        android:textStyle="bold"
+        android:textSize="15sp"
         android:visibility="visible" />
+
+    <cn.edu.bit.codesky.minidouyin.widget.CircleProgressBarView
+        android:id="@+id/circle_progress_bar"
+        android:layout_width="75dp"
+        android:layout_height="75dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="25dp" />
 
     <LinearLayout
         android:layout_width="match_parent"

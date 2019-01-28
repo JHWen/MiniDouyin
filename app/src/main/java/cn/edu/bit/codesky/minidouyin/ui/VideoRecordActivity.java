@@ -5,6 +5,7 @@ import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.Handler;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 
 import cn.edu.bit.codesky.minidouyin.R;
+import cn.edu.bit.codesky.minidouyin.widget.CircleProgressBarView;
 
 import static cn.edu.bit.codesky.minidouyin.util.Utils.MEDIA_TYPE_IMAGE;
 import static cn.edu.bit.codesky.minidouyin.util.Utils.MEDIA_TYPE_VIDEO;
@@ -42,6 +44,8 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
     private Camera mCamera;
     private Button btnNextStep;
     private Chronometer chronometer;
+    private CircleProgressBarView circleProgressBarView;
+    private Button btnRecord;
 
     private int CAMERA_TYPE = Camera.CameraInfo.CAMERA_FACING_BACK;
 
@@ -60,6 +64,7 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_video_record);
 
+        circleProgressBarView = findViewById(R.id.circle_progress_bar);
         chronometer = findViewById(R.id.chronometer);
         mSurfaceView = findViewById(R.id.img);
         //获取摄像头/后置摄像头
@@ -82,25 +87,33 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
             }
         });
 
-        findViewById(R.id.btn_record).setOnClickListener(v -> {
+        btnRecord = findViewById(R.id.btn_record);
+        btnRecord.setOnClickListener(v -> {
             // 录制，第一次点击是start，第二次点击是stop
             if (isRecording) {
-                // 停止录制
-                releaseMediaRecorder();
-                btnNextStep.setEnabled(true);
-                btnNextStep.setVisibility(View.VISIBLE);
-                isRecording = false;
-                chronometer.stop();
-                // 发送广播通知相册更新数据,显示所拍摄的视频
-                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
+                //停止录制
+                stopRecordProcess();
             } else {
-                // 录制
                 if (prepareVideoRecorder()) {
+                    // 录制
                     isRecording = true;
                     Log.d(TAG, "开始录制");
                     // 启动计时器
                     chronometer.setBase(SystemClock.elapsedRealtime());
                     chronometer.start();
+                    circleProgressBarView.startProgressAnimation();
+                    // 事件分发机制，延迟10秒执行操作
+                    new Handler().postDelayed(() -> {
+                        if (isRecording) {
+                            //十秒自动结束录制
+                            stopRecordProcess();
+                        }
+                    }, 11 * 1000);
+
+                    // 视频至少录制3秒
+                    btnRecord.setEnabled(false);
+                    new Handler().postDelayed(() -> btnRecord.setEnabled(true), 3 * 1000);
+
                 } else {
                     isRecording = false;
                 }
@@ -139,6 +152,22 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                 }
             }
         });
+    }
+
+    // 停止录制的一系列操作
+    private void stopRecordProcess() {
+        // 停止录制
+        releaseMediaRecorder();
+
+        btnNextStep.setEnabled(true);
+        btnNextStep.setVisibility(View.VISIBLE);
+        isRecording = false;
+
+        chronometer.stop();
+        circleProgressBarView.stopProgressAnimation();
+        // 发送广播通知相册更新数据,显示所拍摄的视频
+        sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
+
     }
 
     //重新获取摄像头，开始预览
