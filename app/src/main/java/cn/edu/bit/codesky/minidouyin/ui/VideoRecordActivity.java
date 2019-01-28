@@ -5,14 +5,18 @@ import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.Chronometer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -36,6 +40,8 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
 
     private SurfaceView mSurfaceView;
     private Camera mCamera;
+    private Button btnNextStep;
+    private Chronometer chronometer;
 
     private int CAMERA_TYPE = Camera.CameraInfo.CAMERA_FACING_BACK;
 
@@ -54,6 +60,7 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_video_record);
 
+        chronometer = findViewById(R.id.chronometer);
         mSurfaceView = findViewById(R.id.img);
         //获取摄像头/后置摄像头
         rotationDegree = getCameraDisplayOrientation(CAMERA_TYPE);
@@ -63,7 +70,8 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         surfaceHolder.addCallback(this);
 
-        findViewById(R.id.btn_next_step).setOnClickListener(v -> {
+        btnNextStep = findViewById(R.id.btn_next_step);
+        btnNextStep.setOnClickListener(v -> {
             // 下一步 -> 预览视频，上传视频
             if (outputVideoFile != null) {
                 Intent intent = new Intent(this, VideoUploadActivity.class);
@@ -75,22 +83,32 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         });
 
         findViewById(R.id.btn_record).setOnClickListener(v -> {
-            //todo 录制，第一次点击是start，第二次点击是stop
+            // 录制，第一次点击是start，第二次点击是stop
             if (isRecording) {
-                //todo 停止录制
+                // 停止录制
                 releaseMediaRecorder();
+                btnNextStep.setEnabled(true);
+                btnNextStep.setVisibility(View.VISIBLE);
+                isRecording = false;
+                chronometer.stop();
                 // 发送广播通知相册更新数据,显示所拍摄的视频
                 sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
-                isRecording = false;
             } else {
-                //todo 录制
-                prepareVideoRecorder();
-                isRecording = true;
+                // 录制
+                if (prepareVideoRecorder()) {
+                    isRecording = true;
+                    Log.d(TAG, "开始录制");
+                    // 启动计时器
+                    chronometer.setBase(SystemClock.elapsedRealtime());
+                    chronometer.start();
+                } else {
+                    isRecording = false;
+                }
             }
         });
 
         findViewById(R.id.btn_facing).setOnClickListener(v -> {
-            //todo 切换前后摄像头
+            // 切换前后摄像头
             if (CAMERA_TYPE == Camera.CameraInfo.CAMERA_FACING_BACK) {
                 rotationDegree = getCameraDisplayOrientation(Camera.CameraInfo.CAMERA_FACING_FRONT);
                 openCamera(Camera.CameraInfo.CAMERA_FACING_FRONT);
@@ -101,7 +119,7 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         });
 
         findViewById(R.id.btn_zoom).setOnClickListener(v -> {
-            //todo 调焦，需要判断手机是否支持
+            // 调焦，需要判断手机是否支持
             if (mCamera != null) {
                 Camera.Parameters parameters = mCamera.getParameters();
                 if (parameters.isZoomSupported()) {
