@@ -34,7 +34,9 @@
             android:name=".ui.VideoDetailActivity"
             android:theme="@style/AppThemeNoActionBar" />
         <activity android:name=".ui.VideoUploadActivity" />
-        <activity android:name=".ui.VideoRecordActivity"></activity>
+        <activity
+            android:name=".ui.VideoRecordActivity"
+            android:theme="@style/AppThemeNoActionBar" />
     </application>
 
 </manifest>

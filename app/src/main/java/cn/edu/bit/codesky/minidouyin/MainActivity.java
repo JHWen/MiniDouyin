@@ -3,17 +3,23 @@ package cn.edu.bit.codesky.minidouyin;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
+import cn.edu.bit.codesky.minidouyin.adapter.StaggeredItemDecoration;
 import cn.edu.bit.codesky.minidouyin.adapter.VideoListAdapter;
 import cn.edu.bit.codesky.minidouyin.beans.Feed;
 import cn.edu.bit.codesky.minidouyin.beans.FeedResponse;
@@ -40,6 +46,7 @@ public class MainActivity extends AppCompatActivity implements VideoListAdapter.
 
     private RecyclerView recyclerView;
     private VideoListAdapter videoListAdapter;
+    private SwipeRefreshLayout swipeRefreshLayout;
 
     //Restful API host
     private static final String HOST = "http://10.108.10.39:8080/";
@@ -50,6 +57,8 @@ public class MainActivity extends AppCompatActivity implements VideoListAdapter.
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh_layout);
 
         Button btn1 = findViewById(R.id.btn_record);
         btn1.setOnClickListener(v -> {
@@ -76,9 +85,11 @@ public class MainActivity extends AppCompatActivity implements VideoListAdapter.
         recyclerView = findViewById(R.id.rv_video_list);
 
         //set LayoutManager
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
+        StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(2,
+                StaggeredGridLayoutManager.VERTICAL);
         recyclerView.setLayoutManager(layoutManager);
+
+        recyclerView.addItemDecoration(new StaggeredItemDecoration(getApplicationContext(), 5));
 
         //set Adapter
         videoListAdapter = new VideoListAdapter(this);
@@ -86,6 +97,13 @@ public class MainActivity extends AppCompatActivity implements VideoListAdapter.
 
         //refresh feed
         refresh();
+
+        swipeRefreshLayout.setColorSchemeColors(Color.RED, Color.BLUE, Color.GREEN);
+        swipeRefreshLayout.setOnRefreshListener(() -> new Handler().postDelayed(() -> {
+            refresh();
+            //刷新完成
+            swipeRefreshLayout.setRefreshing(false);
+        }, 3000));
     }
 
     /**

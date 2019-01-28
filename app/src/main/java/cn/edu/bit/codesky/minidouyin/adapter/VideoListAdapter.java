@@ -19,6 +19,7 @@ import java.util.List;
 
 import cn.edu.bit.codesky.minidouyin.R;
 import cn.edu.bit.codesky.minidouyin.beans.Feed;
+import cn.edu.bit.codesky.minidouyin.widget.CircleImageView;
 
 
 public class VideoListAdapter extends RecyclerView.Adapter<VideoListAdapter.VideoVideoHolder> {
@@ -70,51 +71,33 @@ public class VideoListAdapter extends RecyclerView.Adapter<VideoListAdapter.Vide
 
     public class VideoVideoHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
 
-        private StandardGSYVideoPlayer videoPlayer;
         private TextView tvItemTitle;
+        private CircleImageView ivItemAvatar;
+        private ImageView imageView;
         private Feed feed;
 
         public VideoVideoHolder(View itemView) {
             super(itemView);
-            videoPlayer = itemView.findViewById(R.id.video_item_player);
             tvItemTitle = itemView.findViewById(R.id.tv_item_title);
+            ivItemAvatar = itemView.findViewById(R.id.iv_item_avatar);
+            imageView = itemView.findViewById(R.id.iv_cover);
 
             itemView.setOnClickListener(VideoVideoHolder.this);
         }
 
         public void bind(int position) {
             feed = videoItems.get(position);
-
             tvItemTitle.setText(feed.getUsername());
-            Log.d(TAG, feed.toString());
-            videoPlayer.setUpLazy(feed.getVideoUrl(), true, null, null, feed.getUsername());
-            //设置Title
-            videoPlayer.getTitleTextView().setVisibility(View.GONE);
-            //设置返回键
-            videoPlayer.getBackButton().setVisibility(View.GONE);
-            //设置全屏功能按钮
-            videoPlayer.getFullscreenButton().setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    videoPlayer.startWindowFullscreen(v.getContext(), false, true);
-                }
-            });
-            //防止错位设置
-            videoPlayer.setPlayTag(TAG);
-            videoPlayer.setPlayPosition(position);
-            //是否根据视频尺寸，自动选择竖屏全屏或者横屏全屏
-            videoPlayer.setAutoFullWithSize(true);
-            //音频焦点冲突时是否释放
-            videoPlayer.setReleaseWhenLossAudio(false);
-            //全屏动画
-            videoPlayer.setShowFullAnimation(true);
-            //小屏时不触摸滑动
-            videoPlayer.setIsTouchWiget(false);
+            //屏幕的宽度(px值）
+            int screenWidth = itemView.getContext().getResources().getDisplayMetrics().widthPixels;
+            //Item的宽度，或图片的宽度
+            int width = screenWidth / 2;
+            Glide.with(itemView.getContext())
+                    .setDefaultRequestOptions(new RequestOptions().centerCrop())
+                    .load(feed.getImageUrl())
+                    .into(imageView);
 
-            //增加封面
-            ImageView imageView = new ImageView(itemView.getContext());
-            loadCover(imageView, feed.getImageUrl());
-            videoPlayer.setThumbImageView(imageView);
+            Log.d(TAG, feed.toString());
         }
 
         private void loadCover(ImageView imageView, String url) {
