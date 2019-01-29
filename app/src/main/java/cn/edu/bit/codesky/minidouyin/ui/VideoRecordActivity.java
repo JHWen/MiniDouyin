@@ -138,6 +138,8 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                         for (File file : videoFiles) {
                             if (file != null && file.exists()) {
                                 file.delete();
+                                // 发送广播通知相册更新数据,显示所拍摄的视频
+                                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
                             }
                         }
                         videoFiles.clear();
@@ -184,12 +186,80 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
 
 
             } else if (videoFiles.size() == 1) {
-                // 直接跳转视频上传界面
-                Intent intent = new Intent(VideoRecordActivity.this, VideoUploadActivity.class);
-                Bundle bundle = new Bundle();
-                bundle.putString(VIDEO_FILE_PATH_KEY, outputVideoFile.getAbsolutePath());
-                intent.putExtra(BUNDLE_KEY, bundle);
-                startActivity(intent);
+                EpVideo epVideo = new EpVideo(videoFiles.get(0).toString());
+                //输出选项，参数为输出文件路径(目前仅支持mp4格式输出)
+                outputVideoFile = getOutputMediaFile(MEDIA_TYPE_VIDEO);
+                EpEditor.OutputOption outputOption = new EpEditor.OutputOption(outputVideoFile.toString());
+                //输出视频宽，默认480
+                outputOption.setHeight(1280);
+                //输出视频高度,默认360
+                outputOption.setWidth(720);
+                outputOption.frameRate = 24;//输出视频帧率,默认30
+                outputOption.bitRate = 10;//输出视频码率,默认10
+                EpEditor.exec(epVideo, outputOption, new OnEditorListener() {
+                    @Override
+                    public void onSuccess() {
+                        Log.d(TAG, "视频合成成功");
+                        // 发送广播通知相册更新数据,显示所拍摄的视频
+                        sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
+
+                        // 删除原来的几小段视频
+                        for (File file : videoFiles) {
+                            if (file != null && file.exists()) {
+                                file.delete();
+                                // 发送广播通知相册更新数据,显示所拍摄的视频
+                                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
+                            }
+                        }
+                        videoFiles.clear();
+
+                        // 在Ui线程上操作
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(getApplicationContext(), "视频处理成功", Toast.LENGTH_LONG)
+                                        .show();
+
+                                // 跳转视频上传界面
+                                Intent intent = new Intent(VideoRecordActivity.this, VideoUploadActivity.class);
+                                Bundle bundle = new Bundle();
+                                bundle.putString(VIDEO_FILE_PATH_KEY, outputVideoFile.getAbsolutePath());
+                                intent.putExtra(BUNDLE_KEY, bundle);
+                                startActivity(intent);
+                            }
+                        });
+
+                    }
+
+                    @Override
+                    public void onFailure() {
+                        Log.d(TAG, "视频合成失败");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(getApplicationContext(), "视频处理失败", Toast.LENGTH_LONG)
+                                        .show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onProgress(float progress) {
+                        //这里获取处理进度
+                        Log.d(TAG, "视频合成进度：" + v);
+                        runOnUiThread(() -> {
+                            progressBar.setVisibility(View.VISIBLE);
+                            progressBar.setProgress((int) Math.min(100 * progress, 100));
+                        });
+                    }
+                });
+
+//                // 直接跳转视频上传界面
+//                Intent intent = new Intent(VideoRecordActivity.this, VideoUploadActivity.class);
+//                Bundle bundle = new Bundle();
+//                bundle.putString(VIDEO_FILE_PATH_KEY, outputVideoFile.getAbsolutePath());
+//                intent.putExtra(BUNDLE_KEY, bundle);
+//                startActivity(intent);
             }
         });
 
