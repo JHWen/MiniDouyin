@@ -68,6 +68,14 @@ public class CircleProgressBarView extends View {
         mValueAnimator.start();
     }
 
+    public void pauseProgressAnimation() {
+        mValueAnimator.pause();
+    }
+
+    public void continueProgressAnimation() {
+        mValueAnimator.resume();
+    }
+
     public void stopProgressAnimation() {
         isRecording = false;
         mValueAnimator.cancel();

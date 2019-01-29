@@ -21,13 +21,18 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Chronometer;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
+import VideoHandle.EpEditor;
+import VideoHandle.EpVideo;
+import VideoHandle.OnEditorListener;
 import cn.edu.bit.codesky.minidouyin.R;
 import cn.edu.bit.codesky.minidouyin.widget.CircleProgressBarView;
 
@@ -52,9 +57,13 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
     private CircleProgressBarView circleProgressBarView;
     private Button btnRecord;
     private Button btnDelete;
+    private ProgressBar progressBar;
 
     private Handler handler;
     private Runnable autoStopRecordRunnable;
+
+    // 总共的录制时间
+    private int totalRecordTime = 0;
 
     private int CAMERA_TYPE = Camera.CameraInfo.CAMERA_FACING_BACK;
 
@@ -74,6 +83,9 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_video_record);
 
+        // 初始化视频list
+        videoFiles = new ArrayList<>();
+
         handler = new Handler();
         autoStopRecordRunnable = () -> {
             if (isRecording) {
@@ -82,6 +94,7 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
             }
         };
 
+        progressBar = findViewById(R.id.progress_bar);
         circleProgressBarView = findViewById(R.id.circle_progress_bar);
         chronometer = findViewById(R.id.chronometer);
         mSurfaceView = findViewById(R.id.img);
@@ -96,8 +109,83 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         btnNextStep = findViewById(R.id.btn_next_step);
         btnNextStep.setOnClickListener(v -> {
             // 下一步 -> 预览视频，上传视频
-            if (outputVideoFile != null) {
-                Intent intent = new Intent(this, VideoUploadActivity.class);
+            if (videoFiles.size() > 1) {
+                // 处理视频
+                ArrayList<EpVideo> epVideos = new ArrayList<>();
+                for (File file : videoFiles) {
+                    epVideos.add(new EpVideo(file.toString()));
+                }
+                //输出选项，参数为输出文件路径(目前仅支持mp4格式输出)
+                outputVideoFile = getOutputMediaFile(MEDIA_TYPE_VIDEO);
+                EpEditor.OutputOption outputOption = new EpEditor.OutputOption(outputVideoFile.toString());
+                //输出视频宽，默认480
+                outputOption.setHeight(1280);
+                //输出视频高度,默认360
+                outputOption.setWidth(720);
+                outputOption.frameRate = 24;//输出视频帧率,默认30
+                outputOption.bitRate = 10;//输出视频码率,默认10
+                Log.d(TAG, "视频合成开始......");
+                Toast.makeText(getApplicationContext(), "正在处理视频......", Toast.LENGTH_LONG)
+                        .show();
+                EpEditor.merge(epVideos, outputOption, new OnEditorListener() {
+                    @Override
+                    public void onSuccess() {
+                        Log.d(TAG, "视频合成成功");
+                        // 发送广播通知相册更新数据,显示所拍摄的视频
+                        sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
+
+                        // 删除原来的几小段视频
+                        for (File file : videoFiles) {
+                            if (file != null && file.exists()) {
+                                file.delete();
+                            }
+                        }
+                        videoFiles.clear();
+
+                        // 在Ui线程上操作
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(getApplicationContext(), "视频处理成功", Toast.LENGTH_LONG)
+                                        .show();
+
+                                // 跳转视频上传界面
+                                Intent intent = new Intent(VideoRecordActivity.this, VideoUploadActivity.class);
+                                Bundle bundle = new Bundle();
+                                bundle.putString(VIDEO_FILE_PATH_KEY, outputVideoFile.getAbsolutePath());
+                                intent.putExtra(BUNDLE_KEY, bundle);
+                                startActivity(intent);
+                            }
+                        });
+
+                    }
+
+                    @Override
+                    public void onFailure() {
+                        Log.d(TAG, "视频合成失败");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(getApplicationContext(), "视频处理失败", Toast.LENGTH_LONG)
+                                        .show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onProgress(float v) {
+                        Log.d(TAG, "视频合成进度：" + v);
+                        runOnUiThread(() -> {
+                            progressBar.setVisibility(View.VISIBLE);
+                            progressBar.setProgress((int) Math.min(100 * v, 100));
+                        });
+                    }
+                });
+
+
+            } else if (videoFiles.size() == 1) {
+                // 直接跳转视频上传界面
+                Intent intent = new Intent(VideoRecordActivity.this, VideoUploadActivity.class);
                 Bundle bundle = new Bundle();
                 bundle.putString(VIDEO_FILE_PATH_KEY, outputVideoFile.getAbsolutePath());
                 intent.putExtra(BUNDLE_KEY, bundle);
@@ -107,33 +195,19 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
 
         btnRecord = findViewById(R.id.btn_record);
         btnRecord.setOnClickListener(v -> {
+
+            // 判断录制时间是否达到10秒
+            if (totalRecordTime >= 10) {
+                return;
+            }
+
             // 录制，第一次点击是start，第二次点击是stop
             if (isRecording) {
-                //停止录制
+                // 停止录制
                 stopRecordProcess();
             } else {
-                if (prepareVideoRecorder()) {
-                    // 录制
-                    isRecording = true;
-                    Log.d(TAG, "开始录制");
-                    // 启动计时器
-                    chronometer.setBase(SystemClock.elapsedRealtime());
-                    chronometer.start();
-                    circleProgressBarView.startProgressAnimation();
-                    // 事件分发机制，延迟10秒执行操作
-                    handler.postDelayed(autoStopRecordRunnable, MAX_RECORD_TIME);
-
-                    //隐藏左右的按钮
-                    btnDelete.setVisibility(View.GONE);
-                    btnNextStep.setVisibility(View.GONE);
-
-                    // 视频至少录制3秒
-                    btnRecord.setEnabled(false);
-                    handler.postDelayed(() -> btnRecord.setEnabled(true), 3 * 1000);
-
-                } else {
-                    isRecording = false;
-                }
+                // 开始录制
+                startRecordProcess();
             }
         });
 
@@ -158,28 +232,42 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
                             Log.d(TAG, "执行删除操作");
-                            if (null != outputVideoFile && outputVideoFile.exists()) {
-                                boolean flag = outputVideoFile.delete();
-                                if (flag) {
-                                    Toast.makeText(getApplicationContext(), "删除成功，请重新录制！", Toast.LENGTH_LONG)
-                                            .show();
 
-                                    // 执行初始化逻辑，清空状态
-                                    btnNextStep.setVisibility(View.GONE);
-                                    btnDelete.setVisibility(View.GONE);
-                                    chronometer.setBase(SystemClock.elapsedRealtime());
-                                    circleProgressBarView.reset();
-
-                                    //移除10秒自动停止任务
-                                    handler.removeCallbacks(autoStopRecordRunnable);
-                                    // 发送广播通知相册更新数据,显示所拍摄的视频
-                                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
-                                    outputVideoFile = null;
-                                } else {
-                                    Toast.makeText(getApplicationContext(), "删除失败", Toast.LENGTH_LONG)
-                                            .show();
+                            // 删除一组视频
+                            for (File file : videoFiles) {
+                                if (null != file && file.exists()) {
+                                    boolean flag = file.delete();
+                                    if (flag) {
+                                        // 发送广播通知相册更新数据,显示所拍摄的视频
+                                        sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
+                                    } else {
+                                        Toast.makeText(getApplicationContext(), "删除失败", Toast.LENGTH_LONG)
+                                                .show();
+                                        return;
+                                    }
                                 }
                             }
+
+                            // 清空视频列表
+                            videoFiles.clear();
+
+                            // 清零总录制时间
+                            totalRecordTime = 0;
+
+                            Toast.makeText(getApplicationContext(), "删除成功，请重新录制！", Toast.LENGTH_LONG)
+                                    .show();
+
+                            // 执行初始化逻辑，清空状态
+                            btnNextStep.setVisibility(View.GONE);
+                            btnDelete.setVisibility(View.GONE);
+
+                            stopRecordTime();
+
+                            circleProgressBarView.reset();
+                            //移除10秒自动停止任务
+                            handler.removeCallbacks(autoStopRecordRunnable);
+
+
                         }
                     })
                     .setNegativeButton("取消", new DialogInterface.OnClickListener() {
@@ -189,6 +277,33 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
                         }
                     }).create().show();
         });
+    }
+
+
+    private long mRecordTime = 0;
+
+    // 定时器操作 开始  暂停  继续
+
+    private void startRecordTime() {
+        chronometer.setBase(SystemClock.elapsedRealtime());
+        chronometer.start();
+    }
+
+    private void pauseRecordTime() {
+        chronometer.stop();
+        // 记录暂停时间
+        mRecordTime = SystemClock.elapsedRealtime();
+        totalRecordTime = Integer.parseInt(chronometer.getText().toString().split(":")[1]);
+    }
+
+    private void continueRecordTime() {
+        chronometer.setBase(chronometer.getBase() + SystemClock.elapsedRealtime() - mRecordTime);
+        chronometer.start();
+    }
+
+    private void stopRecordTime() {
+        chronometer.stop();
+        chronometer.setBase(SystemClock.elapsedRealtime());
     }
 
 
@@ -283,6 +398,39 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
         return (float) sqrt(dx * dx + dy * dy);
     }
 
+    // 开始录制的一系列操作
+    private void startRecordProcess() {
+        if (prepareVideoRecorder()) {
+            // 录制
+            isRecording = true;
+            Log.d(TAG, "开始录制");
+            // 启动计时器
+            if (videoFiles.size() > 0) {
+                continueRecordTime();
+            } else {
+                startRecordTime();
+            }
+
+            // 事件分发机制，延迟10秒执行操作
+            handler.postDelayed(autoStopRecordRunnable, MAX_RECORD_TIME - totalRecordTime * 1000);
+            Log.d(TAG, "已录制时间：" + totalRecordTime);
+            //隐藏左右的按钮
+            btnDelete.setVisibility(View.GONE);
+            btnNextStep.setVisibility(View.GONE);
+
+            // 视频至少录制3秒
+            if (videoFiles.size() == 0) {
+                circleProgressBarView.startProgressAnimation();
+                btnRecord.setEnabled(false);
+                handler.postDelayed(() -> btnRecord.setEnabled(true), 3 * 1000);
+            } else {
+                circleProgressBarView.continueProgressAnimation();
+            }
+        } else {
+            isRecording = false;
+        }
+    }
+
     // 停止录制的一系列操作
     private void stopRecordProcess() {
         // 停止录制
@@ -292,14 +440,22 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
             // 显示取消按钮
             btnNextStep.setVisibility(View.VISIBLE);
             btnDelete.setVisibility(View.VISIBLE);
-            chronometer.stop();
-            circleProgressBarView.stopProgressAnimation();
+
+
+            pauseRecordTime();
+
+            circleProgressBarView.pauseProgressAnimation();
         });
 
         isRecording = false;
+        //移除10秒自动停止任务
+        handler.removeCallbacks(autoStopRecordRunnable);
+        // 记录视频的录制时间
+        videoFiles.add(outputVideoFile);
 
         // 发送广播通知相册更新数据,显示所拍摄的视频
         sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outputVideoFile)));
+
 
     }
 
@@ -421,6 +577,9 @@ public class VideoRecordActivity extends AppCompatActivity implements SurfaceHol
 
     private MediaRecorder mMediaRecorder;
     private File outputVideoFile;
+
+    // 记录多段视频路径
+    private List<File> videoFiles;
 
     private boolean prepareVideoRecorder() {
         //todo 准备MediaRecorder
