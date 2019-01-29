@@ -102,6 +102,13 @@ project : mini-version of Douyin
 #### 2.2 视频列表瀑布流显示
 采用了`StaggeredGridLayoutManager`布局管理器实现，为了图片显示效果好看，用`Glide`对图片进行了`CenterCrop`操作。
 
+<p align="center">
+    <img src="./pic/video_list.jpg" alt="Sample"  width="300" height="500">
+    <p align="center">
+        <em>视频列表页</em>
+    </p>
+</p>
+
 #### 2.3 主要创新点：视频录制功能，增加很多新功能
 
 视频限制最大录制时间为10秒，但是存在一个bug,由于多线程执行的原因造成可能多录制1秒。
@@ -119,9 +126,26 @@ project : mini-version of Douyin
 > 引用了第三方的基于ffmpeg封装的视频处理库：
 > https://github.com/yangjie10930/EpMedia
 
-**演示效果如下所示：**
+**视频录制界面：**
+<p align="center">
+    <img src="./pic/video_record.jpg" alt="Sample"  width="300" height="500">
+    <p align="center">
+        <em>视频录制</em>
+    </p>
+</p>
 
+**录制功能演示效果如下所示：**
 
+删除视频/重新录制功能 、 视频暂停/继续录制功能 、视频处理功能（合并/压缩）
+
+(视频处理过程添加进度条显示，但是第三方库存在处理进度值回调出来的值存在一些bug，导致动画初始值可能为100%)
+
+<p align="center">
+    <img src="./pic/video_record.gif" alt="Sample"  width="300" height="500">
+    <p align="center">
+        <em>视频录制过程</em>
+    </p>
+</p>
 
 
 **注意：为了代码不混乱，且视频录制新功能可能存在bug，视频录制的新功能在video_record_addition分支上。**
